@@ -1,0 +1,19 @@
+# Ambientes virtuais
+venv/
+.venv/
+
+# Arquivos temporários
+*.pyc
+__pycache__/
+*.log
+~$*
+
+# Arquivos de credenciais
+service_account.json
+gdrive_credentials.json
+
+# Planilhas e dados sensíveis
+*.xlsx
+*.xls
+*.csv
+clientes.txt
