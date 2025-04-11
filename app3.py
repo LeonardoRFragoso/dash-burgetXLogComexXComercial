@@ -55,22 +55,20 @@ def normalizar_nome(nome):
 def aplicar_keywords_match(nome, keywords):
     """
     Atualizada para considerar múltiplas correspondências parciais:
-    Para cada keyword, verifica se cada token da keyword está presente no nome normalizado.
-    Caso haja match(es), retorna todas as keywords encontradas separadas por ";".
+    Verifica se cada token da keyword está presente no nome normalizado.
+    Retorna a keyword com maior comprimento (mais completa).
     """
     nome_norm = normalizar_nome(nome)
     matches = [kw for kw in keywords if all(token in nome_norm.split() for token in kw.split())]
     if matches:
-        return "; ".join(matches)
+        return max(matches, key=len)
     return nome_norm
 
 #--------------------------------------
 # FUNÇÕES ESPECÍFICAS DO SCRIPT 1 (Google Drive e Processamento Budget x LogComex)
 def authenticate_drive():
     logging.info("Autenticando no Google Drive...")
-    creds = Credentials.from_service_account_file(
-        CRED_PATH, scopes=["https://www.googleapis.com/auth/drive"]
-    )
+    creds = Credentials.from_service_account_file(CRED_PATH, scopes=["https://www.googleapis.com/auth/drive"])
     return build("drive", "v3", credentials=creds)
 
 def download_excel(service, file_id):
@@ -110,16 +108,13 @@ def update_file_in_drive(service, file_id, local_file_path, mime_type="applicati
     if not os.path.exists(local_file_path):
         logging.error("Arquivo não encontrado: %s", local_file_path)
         return False
-
     file_size = os.path.getsize(local_file_path)
     if file_size == 0:
         logging.error("Arquivo está vazio: %s", local_file_path)
         return False
-
     media = MediaFileUpload(local_file_path, mimetype=mime_type, resumable=True)
     max_retries = 3
     retry_count = 0
-
     while retry_count < max_retries:
         try:
             service.files().update(fileId=file_id, media_body=media).execute()
@@ -138,29 +133,46 @@ def extrair_e_normalizar_nomes_logcomex(df_log, colunas_clientes, keywords):
     nomes = set()
     for col in colunas_clientes:
         if col in df_log.columns:
-            df_log[col].dropna().apply(
-                lambda x: [nomes.add(normalizar_nome(nome.strip())) for nome in str(x).split(",") if nome.strip()]
-            )
+            df_log[col].dropna().apply(lambda x: [nomes.add(normalizar_nome(nome.strip())) for nome in str(x).split(",") if nome.strip()])
     correspondencias = {nome: aplicar_keywords_match(nome, keywords) for nome in nomes}
     return correspondencias
 
+#--------------------------------------
+# Mapeamento de nomes comerciais internos e outros agrupamentos manuais
+nomes_comerciais = {
+    "rio janeiro refrescos": "coca cola andina",
+    "pif paf": "rio branco alimentos",
+    "iff": "iff essencias fragrancias",
+    "iff taubate": "iff essencias fragrancias",
+    "iff guadalupe": "iff essencias fragrancias",
+    "katrium honorio": "katrium industrias quimicas",
+    "katrium santa cruz": "katrium industrias quimicas",
+    "katrium": "katrium industrias quimicas",
+    "maersk": "alianca naval empresa navegacao"  # Novo agrupamento: maersk passa a ser parte de alianca
+}
+
+#--------------------------------------
+# FUNÇÃO PRINCIPAL DO SCRIPT 1 (Processamento Budget x LogComex)
 def main_script1():
     """
-    SCRIPT 1: Processamento dos dados do Budget e LogComex e atualização no Google Drive.
+    Processa os dados do Budget e LogComex, agrupando os registros,
+    e gera a planilha "comparativo_budget_vs_logcomex_final.xlsx" contendo todas
+    as empresas do Budget.
     """
     logging.info("Iniciando Script 1: Processamento Budget vs LogComex")
     service = authenticate_drive()
     logging.info("Fazendo download dos arquivos do Google Drive...")
     df_budget = download_excel(service, BUDGET_FILE_ID)
     df_log = download_excel(service, LOGCOMEX_FILE_ID)
-
+    
     with open(CLIENTES_TXT, "r", encoding="utf-8") as f:
         keywords = [normalizar_nome(l.strip()) for l in f if l.strip()]
-
+    
     logging.info("Processando dados do Budget...")
     df_budget["cliente_can"] = df_budget["CLIENTE (BUDGET)"].apply(lambda x: aplicar_keywords_match(x, keywords))
+    # Agrupa mantendo todas as empresas do Budget
     df_budget_grouped = df_budget.groupby(["cliente_can", "MÊS"]).agg({"BUDGET": "sum"}).reset_index()
-
+    
     logging.info("Processando dados do LogComex...")
     container_cols = ["C20", "C40", "QTDE CONTAINER", "QTDE CONTEINER", "QUANTIDADE C20", "QUANTIDADE C40"]
     for col in container_cols:
@@ -168,7 +180,7 @@ def main_script1():
             df_log[col] = pd.to_numeric(df_log[col].astype(str).str.replace(",", "."), errors="coerce").fillna(0)
     df_log["Containers Somados"] = df_log[[col for col in container_cols if col in df_log.columns]].sum(axis=1)
     df_log["MÊS"] = df_log.apply(extrair_mes, axis=1)
-
+    
     colunas_clientes = [
         "AGENTE DE CARGA", "AGENTE INTERNACIONAL", "ARMADOR",
         "CONSIGNATARIO FINAL", "CONSIGNATÁRIO", "CONSOLIDADOR",
@@ -176,9 +188,8 @@ def main_script1():
         "REMETENTE", "Clientes Encontrados"
     ]
     
-    # Extraindo e normalizando os nomes do LogComex
+    # Extrair nomes do LogComex e normalizar
     correspondencias_logcomex = extrair_e_normalizar_nomes_logcomex(df_log, colunas_clientes, keywords)
-
     registros = []
     for _, row in df_log.iterrows():
         nomes = set()
@@ -193,14 +204,13 @@ def main_script1():
                 "Containers Somados": row.get("Containers Somados", 0),
                 "Categoria": row.get("Categoria", "")
             })
-
     df_log_grouped = pd.DataFrame(registros).groupby(["cliente_can", "MÊS", "Categoria"])["Containers Somados"].sum().reset_index()
-
-    logging.info("Aplicando filtro para manter somente os clientes do Budget presentes na lista de keywords...")
+    
+    # Filtra para manter somente os clientes presentes no Budget
     clientes_budget = set(df_budget_grouped["cliente_can"]) & set(keywords)
     df_budget_final = df_budget_grouped[df_budget_grouped["cliente_can"].isin(clientes_budget)]
     df_log_final = df_log_grouped[df_log_grouped["cliente_can"].isin(clientes_budget)]
-
+    
     logging.info("Realizando pivot dos dados do LogComex...")
     df_log_pivot = df_log_final.pivot_table(
         index=["cliente_can", "MÊS"],
@@ -208,24 +218,22 @@ def main_script1():
         values="Containers Somados",
         fill_value=0
     ).reset_index()
-    
     for categoria in ["Importação", "Exportação", "Cabotagem"]:
         if categoria not in df_log_pivot.columns:
             df_log_pivot[categoria] = 0
 
+    # Merge Budget e LogComex utilizando join à esquerda para manter todas as empresas do Budget
     df_final = pd.merge(df_budget_final, df_log_pivot, how="left", on=["cliente_can", "MÊS"]).fillna(0)
     df_final["Cliente"] = df_final["cliente_can"]
     df_final["BUDGET"] = df_final["BUDGET"].astype(int)
-    
     for categoria in ["Importação", "Exportação", "Cabotagem"]:
         df_final[categoria] = df_final[categoria].round().astype(int)
-    
     df_final = df_final[["Cliente", "MÊS", "BUDGET", "Importação", "Exportação", "Cabotagem"]].sort_values(by=["Cliente", "MÊS"])
-
+    
+    # Salva a planilha comparativa final de Budget vs LogComex
     final_filename = "comparativo_budget_vs_logcomex_final.xlsx"
     df_final.to_excel(final_filename, index=False)
     logging.info("Arquivo gerado: %s", final_filename)
-
     logging.info("Atualizando a planilha final do Budget vs LogComex no Google Drive...")
     drive_service = authenticate_drive()
     sucesso_upload = update_file_in_drive(drive_service, FINAL_COMPARATIVO_FILE_ID, final_filename)
@@ -235,24 +243,27 @@ def main_script1():
         logging.error("Falha ao atualizar a planilha final do Budget vs LogComex no Google Drive.")
 
 #--------------------------------------
-# FUNÇÕES ESPECÍFICAS DO SCRIPT 2 (Processamento iTRACKER e Mesclagem)
+# FUNÇÃO PRINCIPAL DO SCRIPT 2 (Processamento iTRACKER e Merge Completo)
 def main_script2():
     """
-    SCRIPT 2: Processamento da planilha iTRACKER e mesclagem com o comparativo final.
+    Processa a planilha iTRACKER (aba "Planilha1") e faz um merge full (outer)
+    com a planilha comparativa final obtida do Script 1, garantindo que todas as
+    empresas de todas as fontes sejam incluídas.
+    Considera somente registros de 2025 a partir do mês 4.
     """
-    logging.info("Iniciando processamento do iTRACKER e mesclagem com o comparativo final.")
+    logging.info("Iniciando processamento do iTRACKER e merge completo com a base comparativa.")
     path_itracker = ITRACKER_PATH
     path_clientes_txt = CLIENTES_TXT_SCRIPT2
     path_comparativo = COMPARATIVO_PATH
 
     with open(path_clientes_txt, "r", encoding="utf-8") as f:
         keywords = [normalizar_nome(l.strip()) for l in f if l.strip()]
-
-    logging.info("Lendo dados da planilha iTRACKER...")
+    
+    logging.info("Lendo dados da planilha iTRACKER (Planilha1)...")
     df_itracker = pd.read_excel(path_itracker, sheet_name="Planilha1")
     df_itracker["DataEmissao"] = pd.to_datetime(df_itracker["DataEmissao"], errors='coerce')
-
-    logging.info("Aplicando filtros obrigatórios (Empresa, TipoAtendimento, Tipo de Nota Fiscal e Status 'autorizado')...")
+    
+    logging.info("Aplicando filtros obrigatórios na planilha iTRACKER...")
     cond_empresa = df_itracker["Empresa"] == "IRB MATRIZ"
     cond_tipo_atendimento = df_itracker["TipoAtendimento"] == "ATENDIMENTO"
     cond_tipo_nota = (
@@ -263,18 +274,19 @@ def main_script2():
     cond_status = df_itracker["Status"] == "autorizado"
     df_filtrado = df_itracker[cond_empresa & cond_tipo_atendimento & cond_tipo_nota & cond_status].copy()
     logging.info("Número de registros após filtros: %d", df_filtrado.shape[0])
-
+    
+    # Aplica a correspondência para agrupar os clientes do iTRACKER
     df_filtrado["cliente_can"] = df_filtrado["cliente"].apply(lambda x: aplicar_keywords_match(x, keywords))
     df_filtrado["MÊS"] = df_filtrado["DataEmissao"].dt.month
     df_filtrado["ANO"] = df_filtrado["DataEmissao"].dt.year
-
+    # Considera somente o ano de 2025 a partir do mês 4
+    df_filtrado = df_filtrado[(df_filtrado["ANO"] == 2025) & (df_filtrado["MÊS"] >= 4)]
     df_contagem = df_filtrado.groupby(["cliente_can", "ANO", "MÊS"]).size().reset_index(name="Quantidade")
     df_contagem = df_contagem.rename(columns={"cliente_can": "Cliente"})
-
+    
+    # Salva a contagem para apoio
     df_contagem.to_excel("contagem_por_cliente.xlsx", index=False)
     logging.info("Arquivo de apoio 'contagem_por_cliente.xlsx' gerado com sucesso!")
-
-    # Enviando a planilha intermediária "contagem_por_cliente.xlsx" para o Google Drive
     logging.info("Enviando arquivo de apoio 'contagem_por_cliente.xlsx' para o Google Drive...")
     drive_service = authenticate_drive()
     sucesso_upload_intermediary = update_file_in_drive(drive_service, INTERMEDIARY_FILE_ID, "contagem_por_cliente.xlsx")
@@ -282,29 +294,44 @@ def main_script2():
         logging.info("Arquivo 'contagem_por_cliente.xlsx' atualizado com sucesso no Google Drive.")
     else:
         logging.error("Falha ao atualizar o arquivo 'contagem_por_cliente.xlsx' no Google Drive.")
-
-    logging.info("Lendo planilha comparativa final...")
+    
+    logging.info("Lendo a planilha comparativa final gerada (Budget vs LogComex)...")
     df_comparativo = pd.read_excel(path_comparativo)
     if "ANO" not in df_comparativo.columns:
         logging.warning("Planilha comparativa não tem coluna ANO. Adicionando ANO=2025 como padrão.")
         df_comparativo["ANO"] = 2025
-
-    df_merged = pd.merge(
-        df_comparativo,
-        df_contagem,
-        on=["Cliente", "ANO", "MÊS"],
-        how="left"
-    )
-    df_merged["Quantidade_iTRACKER"] = df_merged["Quantidade"].fillna(0).astype(int)
+    
+    # Merge outer: inclui todas as empresas de todas as fontes
+    df_merged = pd.merge(df_comparativo, df_contagem, on=["Cliente", "ANO", "MÊS"], how="outer")
+    df_merged.fillna(0, inplace=True)
+    df_merged["BUDGET"] = df_merged["BUDGET"].astype(int)
+    if "Importação" in df_merged.columns:
+        df_merged["Importação"] = df_merged["Importação"].astype(int)
+    if "Exportação" in df_merged.columns:
+        df_merged["Exportação"] = df_merged["Exportação"].astype(int)
+    if "Cabotagem" in df_merged.columns:
+        df_merged["Cabotagem"] = df_merged["Cabotagem"].astype(int)
+    df_merged["Quantidade_iTRACKER"] = df_merged["Quantidade"].astype(int)
     df_merged.drop(columns=["Quantidade"], inplace=True)
     
-    # Removendo a coluna "ANO" e reorganizando as colunas para o cabeçalho desejado:
+    # Remapeia os nomes com os mapeamentos comerciais (incluindo maersk)
+    df_merged["Cliente"] = df_merged["Cliente"].replace(nomes_comerciais)
+    
+    # Reagrupa para consolidar possíveis duplicações (mesmo Cliente e MÊS)
+    df_merged = df_merged.groupby(["Cliente", "MÊS"]).agg({
+        "BUDGET": "sum",
+        "Importação": "sum",
+        "Exportação": "sum",
+        "Cabotagem": "sum",
+        "Quantidade_iTRACKER": "sum"
+    }).reset_index()
+    
+    # Organiza as colunas e ordena
     colunas_final = ["Cliente", "MÊS", "BUDGET", "Importação", "Exportação", "Cabotagem", "Quantidade_iTRACKER"]
-    df_merged = df_merged[colunas_final]
-
+    df_merged = df_merged[colunas_final].sort_values(by=["Cliente", "MÊS"])
+    
     df_merged.to_excel("comparativo_final_atualizado.xlsx", index=False)
     logging.info("Arquivo gerado: comparativo_final_atualizado.xlsx")
-
     logging.info("Enviando comparativo_final_atualizado.xlsx para o Google Drive...")
     drive_service = authenticate_drive()
     sucesso_upload_final = update_file_in_drive(drive_service, FINAL_ATUALIZADO_FILE_ID, "comparativo_final_atualizado.xlsx")
@@ -320,7 +347,7 @@ def main():
     logging.info("Iniciando Script 1: Processamento Budget vs LogComex e atualização no Google Drive...")
     main_script1()
     logging.info("--------------------------------------------------")
-    logging.info("Iniciando Script 2: Processamento iTRACKER e mesclagem com o comparativo final...")
+    logging.info("Iniciando Script 2: Processamento iTRACKER e merge completo com a base comparativa...")
     main_script2()
     logging.info("--------------------------------------------------")
     logging.info("Processamento concluído com sucesso.")
