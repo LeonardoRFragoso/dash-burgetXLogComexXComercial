@@ -200,12 +200,10 @@ def format_percent(value, positive_is_good=True):
 
 def download_file_from_gdrive():
     try:
-        credentials_file = "C:/Users/leonardo.fragoso/Desktop/Projetos/dash-burgetXLogComexXComercial/service_account.json"
-        if not os.path.exists(credentials_file):
-            st.sidebar.error(f"Arquivo de credenciais não encontrado em: {credentials_file}")
-            return None
-        credentials = service_account.Credentials.from_service_account_file(
-            credentials_file, 
+        # Recupera as credenciais a partir do secrets
+        credentials_info = st.secrets["google"]
+        credentials = service_account.Credentials.from_service_account_info(
+            credentials_info, 
             scopes=['https://www.googleapis.com/auth/drive.readonly']
         )
         drive_service = build('drive', 'v3', credentials=credentials)
@@ -775,7 +773,7 @@ if not filtered_df.empty:
     })
     clientes_prioritarios['Performance'] = (clientes_prioritarios['Quantidade_iTRACKER'] / clientes_prioritarios['BUDGET']) * 100
     clientes_prioritarios = clientes_prioritarios.sort_values(['BUDGET', 'Performance'])
-    # Filtrar somente clientes com performance entre 0 e 70
+    # Filtrar somente clientes com performance entre 0 e 70 (excluindo os zerados)
     clientes_prioritarios = clientes_prioritarios[
         (clientes_prioritarios['BUDGET'] > clientes_prioritarios['BUDGET'].median()) &
         (clientes_prioritarios['Performance'] < 70) &
