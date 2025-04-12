@@ -388,7 +388,7 @@ with col3:
 with col4:
     st.markdown(f"""
     <div class='kpi-card'>
-        <p class='kpi-title'>🎯 PERFORMANCE VS BUDGET</p>
+        <p class='kpi-title'>🎯 PERFORMANCE VS BUDGET (Até Hoje)</p>
         <p class='kpi-value'>{format_percent((total_itracker / total_budget) * 100 if total_budget > 0 else 0)}</p>
     </div>
     """, unsafe_allow_html=True)
