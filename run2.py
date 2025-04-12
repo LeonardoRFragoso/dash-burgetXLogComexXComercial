@@ -272,7 +272,8 @@ if st.sidebar.button("Limpar Filtros"):
     cliente_selecionado = []
 st.sidebar.markdown("---")
 show_detailed_table = st.sidebar.checkbox("Mostrar tabela detalhada", value=True)
-chart_height = st.sidebar.slider("Altura dos gráficos", 400, 800, 500, 50)
+# Atualizado: valor inicial do slider definido para 800
+chart_height = st.sidebar.slider("Altura dos gráficos", 400, 800, 800, 50)
 
 if mes_selecionado and cliente_selecionado:
     filtered_df = df[(df['MÊS'].isin(mes_selecionado)) & (df['Cliente'].isin(cliente_selecionado))]
@@ -292,6 +293,7 @@ if mes_selecionado or cliente_selecionado:
         filtros_ativos.append(f"Clientes: {', '.join(cliente_selecionado)}")
     st.markdown(f"<div style='background-color:#E3F2FD;padding:10px;border-radius:5px;margin-bottom:20px;'>"
                 f"<b>Filtros ativos:</b> {' | '.join(filtros_ativos)}</div>", unsafe_allow_html=True)
+
 
 # =============================================================================
 # SEÇÃO DE KPIS COM CARTÕES APRIMORADOS
