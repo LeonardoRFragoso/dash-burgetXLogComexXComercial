@@ -147,7 +147,7 @@ st.markdown("""
         .titulo-dashboard {
             font-size: 50px;
             font-weight: bold;
-            color: #F37529;
+            color: var(--text-color);
             text-transform: uppercase;
             margin: 0;
         }
