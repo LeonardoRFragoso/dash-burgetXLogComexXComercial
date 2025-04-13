@@ -516,14 +516,14 @@ if not filtered_df.empty:
         )
         fig_gap.update_traces(texttemplate='%{text}', textposition='outside')
         
-        st.markdown("<div class='section'><h3 class='section-title'>🚨 CLIENTES COM MAIOR GAP VS TARGET ACUMULADO</h3></div>", unsafe_allow_html=True)
+        st.markdown("<div class='section'><h3 class='section-title'>🚨 CLIENTES COM MAIOR GAP VS TARGET ACUMULADO ATE HOJE</h3></div>", unsafe_allow_html=True)
         st.plotly_chart(fig_gap, use_container_width=True)
         
         with st.expander("VER DETALHES DO CÁLCULO DESTE GRÁFICO"):
             st.markdown("""
             **DETALHAMENTO DO CÁLCULO:**
             - **FILTRAGEM:** Seleciona os dados referentes ao MÊS CORRENTE.
-            - **AGRUPAMENTO:** Agrupa os dados por CLIENTE somando os valores de TARGET ACUMULADO, REALIZADO SYSTRACKER e GAP DE REALIZAÇÃO.
+            - **AGRUPAMENTO:** Agrupa os dados por CLIENTE somando os valores de TARGET ACUMULADO ATE HOJE, REALIZADO SYSTRACKER e GAP DE REALIZAÇÃO.
             - **CÁLCULO DO GAP:** O GAP é arredondado usando a função `custom_round`.
             - **ORDENAÇÃO:** Os CLIENTES são ordenados em ordem decrescente com base no GAP DE REALIZAÇÃO.
             """)
@@ -531,12 +531,12 @@ if not filtered_df.empty:
         st.info("NÃO EXISTEM DADOS PARA O MÊS CORRENTE PARA ANÁLISE DE GAP.")
 
 # =============================================================================
-# GRÁFICO 1: PERFORMANCE VS BUDGET POR CLIENTE
+# GRÁFICO 1: PERFORMANCE ATUAL VS BUDGET POR CLIENTE
 # =============================================================================
 if not filtered_df.empty:
     budget_df = filtered_df[filtered_df['BUDGET'] > 0].copy()
     if not budget_df.empty:
-        st.markdown("<h4 class='sub-title'>PERFORMANCE VS BUDGET POR CLIENTE</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 class='sub-title'>PERFORMANCE ATUAL VS BUDGET POR CLIENTE</h4>", unsafe_allow_html=True)
         df_graph3 = budget_df.groupby('Cliente', as_index=False).agg({
             'BUDGET': 'sum',
             'Quantidade_iTRACKER': 'sum'
@@ -667,7 +667,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # GRÁFICO 2: COMPARATIVO BUDGET VS REALIZADO POR CATEGORIA (AGRUPADO)
 # =============================================================================
 if not filtered_df.empty:
-    st.markdown("<h4 class='sub-title'>COMPARATIVO BUDGET VS REALIZADO POR CATEGORIA</h4>", unsafe_allow_html=True)
+    st.markdown("<h4 class='sub-title'>BUDGET POR EMPRESA VS LOGCOMEX SEMANAL </h4>", unsafe_allow_html=True)
     clientes_top = filtered_df.groupby('Cliente', as_index=False)['BUDGET'].sum()\
                     .sort_values('BUDGET', ascending=False)['Cliente'].head(15)
     df_top = filtered_df[filtered_df['Cliente'].isin(clientes_top)]
@@ -739,7 +739,7 @@ else:
 if not filtered_df.empty:
     opp_df = filtered_df[(filtered_df['Importação'] + filtered_df['Exportação'] + filtered_df['Cabotagem']) > 0].copy()
     if not opp_df.empty:
-        st.markdown("<h4 class='sub-title'>APROVEITAMENTO DE OPORTUNIDADES POR CLIENTE</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 class='sub-title'>APROVEITAMENTO DE OPORTUNIDADES POR CLIENTE NESTE MÊS</h4>", unsafe_allow_html=True)
         df_graph2 = opp_df.groupby('Cliente', as_index=False).agg({
             'Importação': 'sum',
             'Exportação': 'sum',
@@ -861,7 +861,7 @@ if show_detailed_table and not filtered_df.empty:
             "IMPORTAÇÃO": st.column_config.NumberColumn("IMPORTAÇÃO", format="%d"),
             "EXPORTAÇÃO": st.column_config.NumberColumn("EXPORTAÇÃO", format="%d"),
             "CABOTAGEM": st.column_config.NumberColumn("CABOTAGEM", format="%d"),
-            "TARGET ACUMULADO": st.column_config.NumberColumn("TARGET ACUMULADO", format="%d"),
+            "TARGET ACUMULADO ATE HOJE": st.column_config.NumberColumn("TARGET ACUMULADO", format="%d"),
             "REALIZADO (SYSTRACKER)": st.column_config.TextColumn("REALIZADO (SYSTRACKER)"),
             "GAP DE REALIZAÇÃO": st.column_config.TextColumn("GAP DE REALIZAÇÃO"),
         },
