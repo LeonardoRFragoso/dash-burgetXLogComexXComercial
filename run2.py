@@ -336,24 +336,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # Configuração da API do OpenAI para utilizar o modelo GPT-4
 openai.api_key = st.secrets["openai"]["api_key"]
 
-# =============================================================================
-# ASSISTENTE COMERCIAL COM DROPDOWN DE CLIENTES
-# =============================================================================
 st.markdown("<div class='section'><h3 class='section-title'>🤖 ASSISTENTE COMERCIAL</h3></div>", unsafe_allow_html=True)
-
-# Cria o dropdown com os nomes de clientes, com opção de análise geral
-clientes_lista = sorted(df['Cliente'].unique())
-opcoes_clientes = ["Análise Geral (Sem Cliente)"] + clientes_lista
-cliente_dropdown = st.selectbox("Selecione um cliente para análise (ou mantenha 'Análise Geral'):", options=opcoes_clientes)
-
-# Campo para inserção da pergunta
-pergunta_input = st.text_input(
-    "Digite sua pergunta:",
-    placeholder="Ex: Como está o desempenho da empresa OLAM em abril? (ou pergunte sobre os dados gerais)"
-)
-
-# Extrai o cliente selecionado (se for análise geral, deixamos como None)
-cliente_mencionado = None if cliente_dropdown == "Análise Geral (Sem Cliente)" else cliente_dropdown
 
 # Função para normalizar e remover acentuação de strings
 def normalize_text(text):
@@ -362,7 +345,49 @@ def normalize_text(text):
     text = text.lower().strip()
     return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
 
-# Função aprimorada para extrair o mês mencionado na pergunta (por extenso)
+# FUNÇÃO APRIMORADA PARA EXTRAIR O NOME DO CLIENTE
+def extrair_nome_cliente(pergunta_input, lista_clientes):
+    """
+    Identifica o cliente mais provável a partir da pergunta digitada pelo usuário,
+    mesmo com nomes incompletos ou parciais (ex: 'dart' → 'DART BRASIL LIMITADA').
+    """
+    pergunta_norm = normalize_text(pergunta_input)
+    palavras_pergunta = set(pergunta_norm.split())
+
+    # Candidatos com pelo menos uma palavra da pergunta contida no nome do cliente
+    candidatos = []
+    for cliente in lista_clientes:
+        cliente_norm = normalize_text(cliente)
+        palavras_cliente = set(cliente_norm.split())
+
+        if palavras_pergunta & palavras_cliente:
+            candidatos.append(cliente)
+
+    # Se encontrou candidatos, retorna o mais semelhante
+    if candidatos:
+        melhor_candidato = None
+        melhor_ratio = 0.0
+        for candidato in candidatos:
+            ratio = SequenceMatcher(None, pergunta_norm, normalize_text(candidato)).ratio()
+            if ratio > melhor_ratio:
+                melhor_ratio = ratio
+                melhor_candidato = candidato
+        return melhor_candidato
+
+    # Se nada for encontrado, fallback: usar o mais semelhante da lista inteira
+    melhor_candidato = None
+    melhor_ratio = 0.0
+    for cliente in lista_clientes:
+        ratio = SequenceMatcher(None, pergunta_norm, normalize_text(cliente)).ratio()
+        if ratio > melhor_ratio:
+            melhor_ratio = ratio
+            melhor_candidato = cliente
+    if melhor_ratio >= 0.5:
+        return melhor_candidato
+
+    return None
+
+# Função para extrair o mês mencionado na pergunta (por extenso)
 def extrair_mes_da_pergunta(pergunta):
     meses = {
         "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4,
@@ -375,16 +400,26 @@ def extrair_mes_da_pergunta(pergunta):
             return mes_num
     return None
 
-# Extração do mês (caso a pergunta contenha menção; caso contrário, usar o mês atual)
+# Obter a lista de clientes
+clientes_lista = df["Cliente"].unique()
+
+# Campo para inserção da pergunta
+pergunta_input = st.text_input(
+    "Faça uma pergunta sobre desempenho comercial, oportunidades ou status do cliente:",
+    placeholder="Ex: Como está o desempenho da empresa OLAM em abril?"
+)
+
+# Extração do nome do cliente e do mês (se mencionado) a partir da pergunta
+cliente_mencionado = extrair_nome_cliente(pergunta_input, clientes_lista) if pergunta_input else None
 mes_extraido = extrair_mes_da_pergunta(pergunta_input) if pergunta_input else None
 mes_corrente = mes_extraido if mes_extraido else datetime.now().month
 mes_nome = meses_map.get(mes_corrente, f"Mês {mes_corrente}")
 
-# Exibe mensagem com o cliente identificado (para debug)
+# Exibir o cliente identificado (para debug, pode ser removido)
 if cliente_mencionado:
-    st.info(f"Cliente selecionado: {cliente_mencionado}")
+    st.info(f"Cliente identificado: {cliente_mencionado}")
 
-# Prepara o contexto para resposta
+# Preparação do contexto para a resposta
 if cliente_mencionado:
     df_cliente = df[(df['Cliente'] == cliente_mencionado) & (df['MÊS'] == mes_corrente)]
     if not df_cliente.empty:
@@ -413,7 +448,7 @@ else:
         f"- Performance Geral: {round((total_itracker/total_budget)*100,1) if total_budget > 0 else 0}%\n"
     )
 
-# Botão para submeter a pergunta utilizando os dados reais ou via API GPT-4
+# Botão para submeter a pergunta utilizando os dados reais ou GPT-4
 if st.button("Enviar Pergunta"):
     if pergunta_input.strip() != "":
         with st.spinner("Buscando informações..."):
@@ -425,6 +460,7 @@ if st.button("Enviar Pergunta"):
                     "abaixo do esperado" if performance_cliente >= 50 else
                     "crítica"
                 )
+                
                 resposta_texto = (
                     f"📊 **Análise para {cliente_mencionado} ({mes_nome}):**\n\n"
                     f"A performance está **{status_performance}** com **{performance_cliente:.1f}%** do Budget atingido "
@@ -446,7 +482,7 @@ if st.button("Enviar Pergunta"):
                 sistema_prompt = (
                     "Você é um assistente comercial especialista em análise de dados de logística. "
                     "Responda de forma objetiva e resumida (até 3 parágrafos), utilizando exclusivamente os dados fornecidos. "
-                    "Inclua números, percentuais exatos e recomendações claras. "
+                    "Inclua números e percentuais exatos e, se aplicável, recomendações claras. "
                     "Se os dados disponíveis não forem suficientes, indique claramente que não foi possível extrair informações precisas.\n\n"
                     f"DADOS DISPONÍVEIS:\n{contexto_cliente}"
                 )
@@ -467,6 +503,7 @@ if st.button("Enviar Pergunta"):
         if 'chat_history' not in st.session_state:
             st.session_state.chat_history = []
         st.session_state.chat_history.append({"pergunta": pergunta_input, "resposta": resposta_texto})
+        
         if len(st.session_state.chat_history) > 1:
             with st.expander("Ver histórico de perguntas", expanded=False):
                 for i, item in enumerate(st.session_state.chat_history[:-1]):
@@ -477,7 +514,7 @@ if st.button("Enviar Pergunta"):
         st.warning("Por favor, insira uma pergunta antes de enviar.")
 
 # =============================================================================
-# GRÁFICO PRINCIPAL: Clientes com Maior Gap vs Target Acumulado (Mês Corrente)
+# Gráfico Principal: Clientes com Maior Gap vs Target Acumulado (Mês Corrente)
 # =============================================================================
 def custom_round(x):
     frac = x - int(x)
@@ -516,14 +553,14 @@ if not filtered_df.empty:
         )
         fig_gap.update_traces(texttemplate='%{text}', textposition='outside')
         
-        st.markdown("<div class='section'><h3 class='section-title'>🚨 CLIENTES COM MAIOR GAP VS TARGET ACUMULADO ATE HOJE</h3></div>", unsafe_allow_html=True)
+        st.markdown("<div class='section'><h3 class='section-title'>🚨 CLIENTES COM MAIOR GAP VS TARGET ACUMULADO</h3></div>", unsafe_allow_html=True)
         st.plotly_chart(fig_gap, use_container_width=True)
         
         with st.expander("VER DETALHES DO CÁLCULO DESTE GRÁFICO"):
             st.markdown("""
             **DETALHAMENTO DO CÁLCULO:**
             - **FILTRAGEM:** Seleciona os dados referentes ao MÊS CORRENTE.
-            - **AGRUPAMENTO:** Agrupa os dados por CLIENTE somando os valores de TARGET ACUMULADO ATE HOJE, REALIZADO SYSTRACKER e GAP DE REALIZAÇÃO.
+            - **AGRUPAMENTO:** Agrupa os dados por CLIENTE somando os valores de TARGET ACUMULADO, REALIZADO SYSTRACKER e GAP DE REALIZAÇÃO.
             - **CÁLCULO DO GAP:** O GAP é arredondado usando a função `custom_round`.
             - **ORDENAÇÃO:** Os CLIENTES são ordenados em ordem decrescente com base no GAP DE REALIZAÇÃO.
             """)
@@ -531,12 +568,12 @@ if not filtered_df.empty:
         st.info("NÃO EXISTEM DADOS PARA O MÊS CORRENTE PARA ANÁLISE DE GAP.")
 
 # =============================================================================
-# GRÁFICO 1: PERFORMANCE ATUAL VS BUDGET POR CLIENTE
+# GRÁFICO 1: PERFORMANCE VS BUDGET POR CLIENTE
 # =============================================================================
 if not filtered_df.empty:
     budget_df = filtered_df[filtered_df['BUDGET'] > 0].copy()
     if not budget_df.empty:
-        st.markdown("<h4 class='sub-title'>PERFORMANCE ATUAL VS BUDGET POR CLIENTE</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 class='sub-title'>PERFORMANCE VS BUDGET POR CLIENTE</h4>", unsafe_allow_html=True)
         df_graph3 = budget_df.groupby('Cliente', as_index=False).agg({
             'BUDGET': 'sum',
             'Quantidade_iTRACKER': 'sum'
@@ -667,7 +704,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # GRÁFICO 2: COMPARATIVO BUDGET VS REALIZADO POR CATEGORIA (AGRUPADO)
 # =============================================================================
 if not filtered_df.empty:
-    st.markdown("<h4 class='sub-title'>BUDGET POR EMPRESA VS LOGCOMEX SEMANAL </h4>", unsafe_allow_html=True)
+    st.markdown("<h4 class='sub-title'>COMPARATIVO BUDGET VS REALIZADO POR CATEGORIA</h4>", unsafe_allow_html=True)
     clientes_top = filtered_df.groupby('Cliente', as_index=False)['BUDGET'].sum()\
                     .sort_values('BUDGET', ascending=False)['Cliente'].head(15)
     df_top = filtered_df[filtered_df['Cliente'].isin(clientes_top)]
@@ -737,9 +774,9 @@ else:
 # GRÁFICO 3: APROVEITAMENTO DE OPORTUNIDADES POR CLIENTE
 # =============================================================================
 if not filtered_df.empty:
-    opp_df = filtered_df[(filtered_df['Importação'] + filtered_df['Exportação'] + filtered_df['Cabotagem']) > 0].copy()
+    opp_df = filtered_df[(filtered_df['Importação']+filtered_df['Exportação']+filtered_df['Cabotagem']) > 0].copy()
     if not opp_df.empty:
-        st.markdown("<h4 class='sub-title'>APROVEITAMENTO DE OPORTUNIDADES POR CLIENTE NESTE MÊS</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 class='sub-title'>APROVEITAMENTO DE OPORTUNIDADES POR CLIENTE</h4>", unsafe_allow_html=True)
         df_graph2 = opp_df.groupby('Cliente', as_index=False).agg({
             'Importação': 'sum',
             'Exportação': 'sum',
@@ -861,7 +898,7 @@ if show_detailed_table and not filtered_df.empty:
             "IMPORTAÇÃO": st.column_config.NumberColumn("IMPORTAÇÃO", format="%d"),
             "EXPORTAÇÃO": st.column_config.NumberColumn("EXPORTAÇÃO", format="%d"),
             "CABOTAGEM": st.column_config.NumberColumn("CABOTAGEM", format="%d"),
-            "TARGET ACUMULADO ATE HOJE": st.column_config.NumberColumn("TARGET ACUMULADO", format="%d"),
+            "TARGET ACUMULADO": st.column_config.NumberColumn("TARGET ACUMULADO", format="%d"),
             "REALIZADO (SYSTRACKER)": st.column_config.TextColumn("REALIZADO (SYSTRACKER)"),
             "GAP DE REALIZAÇÃO": st.column_config.TextColumn("GAP DE REALIZAÇÃO"),
         },

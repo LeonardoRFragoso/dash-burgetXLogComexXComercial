@@ -177,7 +177,12 @@ def main_script1():
         keywords = [normalizar_nome(l.strip()) for l in f if l.strip()]
     
     logging.info("Processando dados do Budget...")
-    df_budget["cliente_can"] = df_budget["CLIENTE (BUDGET)"].apply(lambda x: aplicar_keywords_match(x, keywords))
+    # Se a coluna do budget for "CLIENTE (BUDGET)" a usamos para criar a coluna 'cliente_can'
+    if "CLIENTE (BUDGET)" in df_budget.columns:
+        df_budget["cliente_can"] = df_budget["CLIENTE (BUDGET)"].apply(lambda x: aplicar_keywords_match(x, keywords))
+    else:
+        # Caso já esteja a coluna "Cliente"
+        df_budget["cliente_can"] = df_budget["Cliente"].apply(lambda x: aplicar_keywords_match(x, keywords))
     # Agrupa mantendo todas as empresas do Budget
     df_budget_grouped = df_budget.groupby(["cliente_can", "MÊS"]).agg({"BUDGET": "sum"}).reset_index()
     
@@ -215,6 +220,7 @@ def main_script1():
     df_log_grouped = pd.DataFrame(registros).groupby(["cliente_can", "MÊS", "Categoria"])["Containers Somados"].sum().reset_index()
     
     # Filtra para manter somente os clientes presentes no Budget
+    # OBSERVAÇÃO: Aqui a interseção entre os nomes do budget e as keywords pode filtrar registros se não houver correspondência exata.
     clientes_budget = set(df_budget_grouped["cliente_can"]) & set(keywords)
     df_budget_final = df_budget_grouped[df_budget_grouped["cliente_can"].isin(clientes_budget)]
     df_log_final = df_log_grouped[df_log_grouped["cliente_can"].isin(clientes_budget)]
