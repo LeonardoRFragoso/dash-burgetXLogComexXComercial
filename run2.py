@@ -5,15 +5,10 @@ import plotly.graph_objects as go
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
-import io, os, re, unicodedata
+import io, os
 from datetime import datetime
 import numpy as np
 import math
-import openai
-from difflib import SequenceMatcher
-
-# ATENÇÃO: Se estiver usando openai>=1.0.0, execute "openai migrate"
-# ou, alternativamente, fixe a versão anterior com "pip install openai==0.28.0"
 
 # Configuração da página
 st.set_page_config(
@@ -37,7 +32,7 @@ COLORS = {
     'chart2': ['#42A5F5', '#7E57C2', '#26A69A', '#EC407A', '#FFA726']
 }
 
-# CSS personalizado
+# CSS personalizado (com fonte Inter, animação, melhorias no layout, KPI uniformizados e footer com ícones)
 st.markdown(f"""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -134,7 +129,7 @@ st.markdown(f"""
 </style>
 """, unsafe_allow_html=True)
 
-# Novo cabeçalho estilizado
+# Novo cabeçalho estilizado para o dashboard
 st.markdown("""
     <style>
         .titulo-dashboard-container {
@@ -166,7 +161,7 @@ st.markdown("""
 
 st.markdown("""
     <div class="titulo-dashboard-container">
-        <h1 class="titulo-dashboard">Dashboard de análise comercial de clientes</h1>
+        <h1 class="titulo-dashboard">Dashboard de analise comercial de clientes</h1>
         <p class="subtitulo-dashboard">Monitoramento em tempo real do desempenho comercial</p>
     </div>
 """, unsafe_allow_html=True)
@@ -175,8 +170,10 @@ st.markdown("""
     <hr style="border-top: 3px solid #F37529; margin: 20px 0;">
 """, unsafe_allow_html=True)
 
+# Definindo a data atual para o footer
 current_date = datetime.now().strftime("%d de %B de %Y")
 
+# Funções utilitárias
 def styled_container(title):
     st.markdown(f"<div class='section'><h3 class='section-title'>{title}</h3>", unsafe_allow_html=True)
     return st
@@ -201,26 +198,12 @@ def format_percent(value, positive_is_good=True):
         color = COLORS['danger'] if positive_is_good else COLORS['success']
         return f"<span style='color:{color};font-weight:bold'>{value:.1f}%</span>"
 
-# Função para carregar os dados com cache
-@st.cache_data
-def load_data():
-    df = download_file_from_gdrive()
-    if df is None:
-        st.error("Não foi possível carregar os dados do Google Sheets.")
-        st.stop()
-    # Remove registros sem nome de cliente
-    df = df[df['Cliente'].notna() & (df['Cliente'] != "undefined")]
-    numeric_cols = ['MÊS', 'BUDGET', 'Importação', 'Exportação', 'Cabotagem', 'Quantidade_iTRACKER']
-    for col in numeric_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce')
-    df['Cliente'] = df['Cliente'].str.upper()
-    return df
-
 def download_file_from_gdrive():
     try:
+        # Recupera as credenciais a partir dos secrets do Streamlit Cloud
         credentials_info = st.secrets["google"]
         credentials = service_account.Credentials.from_service_account_info(
-            credentials_info,
+            credentials_info, 
             scopes=['https://www.googleapis.com/auth/drive.readonly']
         )
         drive_service = build('drive', 'v3', credentials=credentials)
@@ -247,7 +230,22 @@ def download_file_from_gdrive():
         st.sidebar.error(f"Erro ao acessar o Google Drive: {str(e)}")
         return None
 
-df = load_data()
+# Carregar os dados do Google Sheets
+df = download_file_from_gdrive()
+if df is None:
+    st.error("Não foi possível carregar os dados do Google Sheets.")
+    st.stop()
+
+# Remover registros sem nome de cliente para evitar "undefined"
+df = df[df['Cliente'].notna() & (df['Cliente'] != "undefined")]
+
+# Converter colunas numéricas, se necessário
+numeric_cols = ['MÊS', 'BUDGET', 'Importação', 'Exportação', 'Cabotagem', 'Quantidade_iTRACKER']
+for col in numeric_cols:
+    df[col] = pd.to_numeric(df[col], errors='coerce')
+
+# Converter todas as referências a clientes para maiúsculas
+df['Cliente'] = df['Cliente'].str.upper()
 
 # Sidebar - Filtros de Análise
 st.sidebar.markdown("---")
@@ -274,7 +272,7 @@ if st.sidebar.button("Limpar Filtros"):
     cliente_selecionado = []
 st.sidebar.markdown("---")
 show_detailed_table = st.sidebar.checkbox("Mostrar tabela detalhada", value=True)
-chart_height = st.sidebar.slider("Altura dos gráficos", 400, 800, 800, 50)
+chart_height = st.sidebar.slider("Altura dos gráficos", 400, 800, 500, 50)
 
 if mes_selecionado and cliente_selecionado:
     filtered_df = df[(df['MÊS'].isin(mes_selecionado)) & (df['Cliente'].isin(cliente_selecionado))]
@@ -292,7 +290,8 @@ if mes_selecionado or cliente_selecionado:
         filtros_ativos.append(f"Meses: {', '.join(map(str, meses_texto))}")
     if cliente_selecionado:
         filtros_ativos.append(f"Clientes: {', '.join(cliente_selecionado)}")
-    st.markdown(f"<div style='background-color:#E3F2FD;padding:10px;border-radius:5px;margin-bottom:20px;'><b>Filtros ativos:</b> {' | '.join(filtros_ativos)}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='background-color:#E3F2FD;padding:10px;border-radius:5px;margin-bottom:20px;'>"
+                f"<b>Filtros ativos:</b> {' | '.join(filtros_ativos)}</div>", unsafe_allow_html=True)
 
 # =============================================================================
 # SEÇÃO DE KPIS COM CARTÕES APRIMORADOS
@@ -333,192 +332,16 @@ with col4:
     """, unsafe_allow_html=True)
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Configuração da API do OpenAI para utilizar o modelo GPT-4
-openai.api_key = st.secrets["openai"]["api_key"]
-
-st.markdown("<div class='section'><h3 class='section-title'>🤖 ASSISTENTE COMERCIAL</h3></div>", unsafe_allow_html=True)
-
-# Função para normalizar e remover acentuação de strings
-def normalize_text(text):
-    if not isinstance(text, str):
-        return ""
-    text = text.lower().strip()
-    return unicodedata.normalize('NFKD', text).encode('ASCII', 'ignore').decode('ASCII')
-
-# FUNÇÃO APRIMORADA PARA EXTRAIR O NOME DO CLIENTE
-def extrair_nome_cliente(pergunta_input, lista_clientes):
-    """
-    Identifica o cliente mais provável a partir da pergunta digitada pelo usuário,
-    mesmo com nomes incompletos ou parciais (ex: 'dart' → 'DART BRASIL LIMITADA').
-    """
-    pergunta_norm = normalize_text(pergunta_input)
-    palavras_pergunta = set(pergunta_norm.split())
-
-    # Candidatos com pelo menos uma palavra da pergunta contida no nome do cliente
-    candidatos = []
-    for cliente in lista_clientes:
-        cliente_norm = normalize_text(cliente)
-        palavras_cliente = set(cliente_norm.split())
-
-        if palavras_pergunta & palavras_cliente:
-            candidatos.append(cliente)
-
-    # Se encontrou candidatos, retorna o mais semelhante
-    if candidatos:
-        melhor_candidato = None
-        melhor_ratio = 0.0
-        for candidato in candidatos:
-            ratio = SequenceMatcher(None, pergunta_norm, normalize_text(candidato)).ratio()
-            if ratio > melhor_ratio:
-                melhor_ratio = ratio
-                melhor_candidato = candidato
-        return melhor_candidato
-
-    # Se nada for encontrado, fallback: usar o mais semelhante da lista inteira
-    melhor_candidato = None
-    melhor_ratio = 0.0
-    for cliente in lista_clientes:
-        ratio = SequenceMatcher(None, pergunta_norm, normalize_text(cliente)).ratio()
-        if ratio > melhor_ratio:
-            melhor_ratio = ratio
-            melhor_candidato = cliente
-    if melhor_ratio >= 0.5:
-        return melhor_candidato
-
-    return None
-
-# Função para extrair o mês mencionado na pergunta (por extenso)
-def extrair_mes_da_pergunta(pergunta):
-    meses = {
-        "janeiro": 1, "fevereiro": 2, "março": 3, "marco": 3, "abril": 4,
-        "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
-        "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12
-    }
-    pergunta_norm = normalize_text(pergunta)
-    for mes_nome, mes_num in meses.items():
-        if mes_nome in pergunta_norm:
-            return mes_num
-    return None
-
-# Obter a lista de clientes
-clientes_lista = df["Cliente"].unique()
-
-# Campo para inserção da pergunta
-pergunta_input = st.text_input(
-    "Faça uma pergunta sobre desempenho comercial, oportunidades ou status do cliente:",
-    placeholder="Ex: Como está o desempenho da empresa OLAM em abril?"
-)
-
-# Extração do nome do cliente e do mês (se mencionado) a partir da pergunta
-cliente_mencionado = extrair_nome_cliente(pergunta_input, clientes_lista) if pergunta_input else None
-mes_extraido = extrair_mes_da_pergunta(pergunta_input) if pergunta_input else None
-mes_corrente = mes_extraido if mes_extraido else datetime.now().month
-mes_nome = meses_map.get(mes_corrente, f"Mês {mes_corrente}")
-
-# Exibir o cliente identificado (para debug, pode ser removido)
-if cliente_mencionado:
-    st.info(f"Cliente identificado: {cliente_mencionado}")
-
-# Preparação do contexto para a resposta
-if cliente_mencionado:
-    df_cliente = df[(df['Cliente'] == cliente_mencionado) & (df['MÊS'] == mes_corrente)]
-    if not df_cliente.empty:
-        budget_cliente = df_cliente['BUDGET'].sum()
-        realizado_cliente = df_cliente['Quantidade_iTRACKER'].sum()
-        oportunidades_cliente = df_cliente[['Importação', 'Exportação', 'Cabotagem']].sum().sum()
-        performance_cliente = (realizado_cliente / budget_cliente) * 100 if budget_cliente > 0 else 0
-        gap_cliente = df_cliente['Gap de Realização'].sum()
-        contexto_cliente = (
-            f"Dados do cliente {cliente_mencionado} ({mes_nome}):\n"
-            f"- Budget: {int(budget_cliente)}\n"
-            f"- Realizado: {int(realizado_cliente)}\n"
-            f"- Oportunidades: {int(oportunidades_cliente)}\n"
-            f"- Performance: {performance_cliente:.1f}%\n"
-            f"- Gap: {gap_cliente:.0f}\n"
-        )
-    else:
-        contexto_cliente = f"Não foram encontrados dados para o cliente {cliente_mencionado} no {mes_nome}."
-else:
-    total_budget = filtered_df['BUDGET'].sum()
-    total_itracker = filtered_df['Quantidade_iTRACKER'].sum()
-    contexto_cliente = (
-        f"Dados Gerais ({mes_nome}):\n"
-        f"- Budget Total: {format_number(total_budget)}\n"
-        f"- Realizado Total: {format_number(total_itracker)}\n"
-        f"- Performance Geral: {round((total_itracker/total_budget)*100,1) if total_budget > 0 else 0}%\n"
-    )
-
-# Botão para submeter a pergunta utilizando os dados reais ou GPT-4
-if st.button("Enviar Pergunta"):
-    if pergunta_input.strip() != "":
-        with st.spinner("Buscando informações..."):
-            if cliente_mencionado and 'df_cliente' in locals() and not df_cliente.empty:
-                status_performance = (
-                    "excelente" if performance_cliente >= 100 else
-                    "satisfatória" if performance_cliente >= 80 else
-                    "média" if performance_cliente >= 70 else
-                    "abaixo do esperado" if performance_cliente >= 50 else
-                    "crítica"
-                )
-                
-                resposta_texto = (
-                    f"📊 **Análise para {cliente_mencionado} ({mes_nome}):**\n\n"
-                    f"A performance está **{status_performance}** com **{performance_cliente:.1f}%** do Budget atingido "
-                    f"({int(realizado_cliente)} de {int(budget_cliente)} containers).\n\n"
-                )
-                if oportunidades_cliente > 0:
-                    aproveitamento = (realizado_cliente / oportunidades_cliente) * 100
-                    resposta_texto += (
-                        f"**Aproveitamento de Oportunidades:** {aproveitamento:.1f}% "
-                        f"({int(realizado_cliente)} de {int(oportunidades_cliente)} potenciais).\n\n"
-                    )
-                if performance_cliente < 70:
-                    resposta_texto += "**Recomendação:** Necessita atenção prioritária para reduzir o gap de atendimento."
-                elif performance_cliente < 100:
-                    resposta_texto += "**Recomendação:** Um follow-up adicional pode ajudar a atingir a meta."
-                else:
-                    resposta_texto += "**Recomendação:** Manter a estratégia atual que tem mostrado eficácia."
-            else:
-                sistema_prompt = (
-                    "Você é um assistente comercial especialista em análise de dados de logística. "
-                    "Responda de forma objetiva e resumida (até 3 parágrafos), utilizando exclusivamente os dados fornecidos. "
-                    "Inclua números e percentuais exatos e, se aplicável, recomendações claras. "
-                    "Se os dados disponíveis não forem suficientes, indique claramente que não foi possível extrair informações precisas.\n\n"
-                    f"DADOS DISPONÍVEIS:\n{contexto_cliente}"
-                )
-                try:
-                    resposta = openai.ChatCompletion.create(
-                        model="gpt-4",
-                        messages=[
-                            {"role": "system", "content": sistema_prompt},
-                            {"role": "user", "content": pergunta_input}
-                        ],
-                        temperature=0.3,
-                        max_tokens=500
-                    )
-                    resposta_texto = resposta.choices[0].message['content']
-                except Exception as e:
-                    resposta_texto = f"⚠️ Erro ao processar sua pergunta: {str(e)}"
-        st.markdown(f"**Resposta:**\n\n{resposta_texto}")
-        if 'chat_history' not in st.session_state:
-            st.session_state.chat_history = []
-        st.session_state.chat_history.append({"pergunta": pergunta_input, "resposta": resposta_texto})
-        
-        if len(st.session_state.chat_history) > 1:
-            with st.expander("Ver histórico de perguntas", expanded=False):
-                for i, item in enumerate(st.session_state.chat_history[:-1]):
-                    st.markdown(f"**Pergunta {i+1}:** {item['pergunta']}")
-                    st.markdown(f"**Resposta {i+1}:** {item['resposta']}")
-                    st.markdown("---")
-    else:
-        st.warning("Por favor, insira uma pergunta antes de enviar.")
-
 # =============================================================================
 # Gráfico Principal: Clientes com Maior Gap vs Target Acumulado (Mês Corrente)
 # =============================================================================
+
 def custom_round(x):
     frac = x - int(x)
-    return int(x) + 1 if frac > 0.5 else int(x)
+    if frac > 0.5:
+        return int(x) + 1
+    else:
+        return int(x)
 
 if not filtered_df.empty:
     current_month = datetime.now().month
@@ -529,6 +352,7 @@ if not filtered_df.empty:
             "Quantidade_iTRACKER": "sum",
             "Gap de Realização": "sum"
         })
+        # Como já convertidos para uppercase, não é mais necessário converter aqui.
         df_gap['Gap de Realização'] = df_gap['Gap de Realização'].apply(custom_round)
         df_gap = df_gap.sort_values("Gap de Realização", ascending=False)
         df_gap_top = df_gap.head(15)
@@ -560,9 +384,12 @@ if not filtered_df.empty:
             st.markdown("""
             **DETALHAMENTO DO CÁLCULO:**
             - **FILTRAGEM:** Seleciona os dados referentes ao MÊS CORRENTE.
-            - **AGRUPAMENTO:** Agrupa os dados por CLIENTE somando os valores de TARGET ACUMULADO, REALIZADO SYSTRACKER e GAP DE REALIZAÇÃO.
-            - **CÁLCULO DO GAP:** O GAP é arredondado usando a função `custom_round`.
-            - **ORDENAÇÃO:** Os CLIENTES são ordenados em ordem decrescente com base no GAP DE REALIZAÇÃO.
+            - **AGRUPAMENTO:** Os dados são agrupados por CLIENTE e somam os valores de:
+                - TARGET ACUMULADO
+                - REALIZADO SYSTRACKER
+                - GAP DE REALIZAÇÃO
+            - **CÁLCULO DO GAP:** O GAP é arredondado pela função `custom_round`.
+            - **ORDENAÇÃO:** Os CLIENTES são ordenados de forma decrescente pelo GAP DE REALIZAÇÃO.
             """)
     else:
         st.info("NÃO EXISTEM DADOS PARA O MÊS CORRENTE PARA ANÁLISE DE GAP.")
@@ -845,7 +672,7 @@ if not filtered_df.empty:
         """, unsafe_allow_html=True)
     else:
         st.info("SEM DADOS DE OPORTUNIDADES DISPONÍVEIS PARA OS FILTROS SELECIONADOS.")
-        
+
 # =============================================================================
 # Tabela de Dados Detalhados
 # =============================================================================
@@ -856,15 +683,17 @@ if show_detailed_table and not filtered_df.empty:
         detailed_df = filtered_df.sort_values(['Cliente', 'MÊS'])
     else:
         detailed_df = filtered_df.sort_values(['Cliente'])
-    detailed_df['MÊS_NOME'] = detailed_df['MÊS'].map(meses_map)
+    detailed_df['Mês_Nome'] = detailed_df['MÊS'].map(meses_map)
+    # Ajustar colunas presentes em seu dataset
     detailed_df = detailed_df[[ 
-        'Cliente', 'MÊS', 'MÊS_NOME', 'BUDGET', 'Importação', 'Exportação', 'Cabotagem',
-        'Target Acumulado', 'Quantidade_iTRACKER', 'Gap de Realização'
+        'Cliente', 'MÊS', 'Mês_Nome', 'BUDGET', 'Importação', 'Exportação', 'Cabotagem',
+        'Target Acumulado', 'Quantidade_iTRACKER', 'Gap de Realização' 
     ]]
     detailed_df.columns = [
         'CLIENTE', 'MÊS (NÚM)', 'MÊS', 'BUDGET', 'IMPORTAÇÃO', 'EXPORTAÇÃO',
         'CABOTAGEM', 'TARGET ACUMULADO', 'REALIZADO (SYSTRACKER)', 'GAP DE REALIZAÇÃO'
     ]
+    # Correção: utilizar "MÊS (NÚM)" com acento correto na ordenação
     detailed_df = detailed_df.sort_values(['CLIENTE', 'MÊS (NÚM)'])
     cols = st.columns([3, 1])
     with cols[0]:
@@ -946,6 +775,7 @@ if not filtered_df.empty:
     })
     clientes_prioritarios['Performance'] = (clientes_prioritarios['Quantidade_iTRACKER'] / clientes_prioritarios['BUDGET']) * 100
     clientes_prioritarios = clientes_prioritarios.sort_values(['BUDGET', 'Performance'])
+    # Filtrar somente clientes com performance entre 0 e 70 (excluindo os zerados)
     clientes_prioritarios = clientes_prioritarios[
         (clientes_prioritarios['BUDGET'] > clientes_prioritarios['BUDGET'].median()) &
         (clientes_prioritarios['Performance'] < 70) &
