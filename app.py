@@ -33,6 +33,8 @@ COMPARATIVO_PATH = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogC
 # NOVA CONFIGURAÇÃO: IDs de destino para os envios ao Google Drive
 FINAL_ATUALIZADO_FILE_ID = "1Bphi7lChPqh12kAStpupXJmCbwcdImKo"       # Para comparativo_final_atualizado.xlsx
 INTERMEDIARY_FILE_ID    = "1uYCQ9wrWwTqocnF3qxvX7uFwrjqv93cf"       # Para contagem_por_cliente.xlsx
+# ID da Planilha_Final.xlsx conforme a URL fornecida:
+FINAL_PLANILHA_FINAL_FILE_ID = "1cvKhwi3w3RdEyfBQwjqANziSmJe_yzKm"
 
 #--------------------------------------
 # FUNÇÕES COMUNS (Script 1 e Script 2)
@@ -149,7 +151,6 @@ nomes_comerciais = {
     "katrium santa cruz": "katrium industrias quimicas",
     "katrium": "katrium industrias quimicas",
     "maersk": "alianca naval empresa navegacao",  # Novo agrupamento: maersk passa a ser parte de alianca
-
     # Novos agrupamentos conforme solicitado:
     "blue water logistics": "blue water",
     "blue water shipping brasil": "blue water",
@@ -177,12 +178,7 @@ def main_script1():
         keywords = [normalizar_nome(l.strip()) for l in f if l.strip()]
     
     logging.info("Processando dados do Budget...")
-    # Se a coluna do budget for "CLIENTE (BUDGET)" a usamos para criar a coluna 'cliente_can'
-    if "CLIENTE (BUDGET)" in df_budget.columns:
-        df_budget["cliente_can"] = df_budget["CLIENTE (BUDGET)"].apply(lambda x: aplicar_keywords_match(x, keywords))
-    else:
-        # Caso já esteja a coluna "Cliente"
-        df_budget["cliente_can"] = df_budget["Cliente"].apply(lambda x: aplicar_keywords_match(x, keywords))
+    df_budget["cliente_can"] = df_budget["CLIENTE (BUDGET)"].apply(lambda x: aplicar_keywords_match(x, keywords))
     # Agrupa mantendo todas as empresas do Budget
     df_budget_grouped = df_budget.groupby(["cliente_can", "MÊS"]).agg({"BUDGET": "sum"}).reset_index()
     
@@ -220,7 +216,6 @@ def main_script1():
     df_log_grouped = pd.DataFrame(registros).groupby(["cliente_can", "MÊS", "Categoria"])["Containers Somados"].sum().reset_index()
     
     # Filtra para manter somente os clientes presentes no Budget
-    # OBSERVAÇÃO: Aqui a interseção entre os nomes do budget e as keywords pode filtrar registros se não houver correspondência exata.
     clientes_budget = set(df_budget_grouped["cliente_can"]) & set(keywords)
     df_budget_final = df_budget_grouped[df_budget_grouped["cliente_can"].isin(clientes_budget)]
     df_log_final = df_log_grouped[df_log_grouped["cliente_can"].isin(clientes_budget)]
@@ -386,6 +381,33 @@ def main_script2():
         logging.info("comparativo_final_atualizado.xlsx atualizado com sucesso no Google Drive.")
     else:
         logging.error("Falha ao atualizar comparativo_final_atualizado.xlsx no Google Drive.")
+    
+    # ----- Criação da Planilha_Final.xlsx conforme o desenho do gestor -----
+    # Recalcular Total Oportunidade se necessário
+    df_merged["Total Oportunidade"] = df_merged["Importação"] + df_merged["Exportação"] + df_merged["Cabotagem"]
+    # Mapeamento de colunas conforme a planilha desenhada pelo gestor
+    colunas_reordenadas = {
+        "Cliente": "Cliente",
+        "BUDGET": "BUDGET",
+        "Target Acumulado": "Target Acumulado",
+        "Quantidade_iTRACKER": "Realizado Systracker",
+        "Gap de Realização": "Gap de Realização",
+        "Total Oportunidade": "Total Oportunidade",
+        "Importação": "Op. Importação",
+        "Exportação": "Op. Exportação",
+        "Cabotagem": "Op. Cabotagem"
+    }
+    df_planilha_final = df_merged[list(colunas_reordenadas.keys())].rename(columns=colunas_reordenadas)
+    df_planilha_final = df_planilha_final.sort_values(by=["Cliente"])
+    planilha_final_filename = "Planilha_Final.xlsx"
+    df_planilha_final.to_excel(planilha_final_filename, index=False)
+    logging.info("Planilha final gerada: %s", planilha_final_filename)
+    # Enviar a planilha final ao Google Drive utilizando o ID fornecido
+    sucesso_upload_final_planilha = update_file_in_drive(drive_service, FINAL_PLANILHA_FINAL_FILE_ID, planilha_final_filename)
+    if sucesso_upload_final_planilha:
+        logging.info("Planilha_Final.xlsx atualizada com sucesso no Google Drive.")
+    else:
+        logging.error("Falha ao atualizar Planilha_Final.xlsx no Google Drive.")
 
 #--------------------------------------
 # FUNÇÃO PRINCIPAL UNIFICADA
