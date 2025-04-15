@@ -1,5 +1,6 @@
 import time
 import requests
+import tempfile
 import logging
 import re
 import os
@@ -444,8 +445,10 @@ def main():
         chrome_options.add_argument("--silent")
 
         # Adicionar diretório de perfil temporário
-        user_data_dir = f"/tmp/chrome_profile_{int(time.time())}"
+        import tempfile
+        user_data_dir = tempfile.mkdtemp(prefix="chrome_profile_")
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+
 
         
         service = Service(chrome_driver_path)
