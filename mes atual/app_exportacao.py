@@ -435,7 +435,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def main():
     try:
-        chrome_driver_path = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\chromedriver.exe"
+        chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
         chrome_options = Options()
         # chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
