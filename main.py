@@ -455,8 +455,8 @@ def executar_script(nome_script, max_tentativas=3, tempo_espera=30):
 
 def main():
     scripts = [
-        os.path.join('mes atual', 'app_exportacao.py'),
-        os.path.join('mes atual', 'app_importacao.py'),
+        #os.path.join('mes atual', 'app_exportacao.py'),
+        #os.path.join('mes atual', 'app_importacao.py'),
         os.path.join('mes atual', 'app_cabotagem.py')
     ]
 

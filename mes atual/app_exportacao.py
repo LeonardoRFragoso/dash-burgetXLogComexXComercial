@@ -436,7 +436,7 @@ def main():
     try:
         chrome_driver_path = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\chromedriver.exe"
         chrome_options = Options()
-        chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
+        #chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
