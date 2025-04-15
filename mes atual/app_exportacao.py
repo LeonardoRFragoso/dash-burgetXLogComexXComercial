@@ -435,6 +435,8 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def main():
     try:
+        import tempfile
+
         chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
         chrome_options = Options()
         chrome_options.add_argument("--disable-gpu")
@@ -444,16 +446,14 @@ def main():
         chrome_options.add_argument("--log-level=3")
         chrome_options.add_argument("--silent")
 
-        # Adicionar diretório de perfil temporário
-        import tempfile
+        # Diretório temporário seguro para evitar conflito com perfis
         user_data_dir = tempfile.mkdtemp(prefix="chrome_profile_")
         chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
 
-
-        
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 20)
+
         
         try:
             driver.get("https://plataforma.logcomex.io/signIn/")
