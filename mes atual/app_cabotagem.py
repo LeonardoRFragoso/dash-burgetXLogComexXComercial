@@ -23,6 +23,7 @@ class CaptchaError(Exception):
     pass
 
 # ----------------- Funções de Data -----------------
+# Funções originais (mantidas para referência ou uso posterior)
 def get_date_range_7_days():
     hoje = datetime.now()
     fim = hoje - timedelta(days=1)  # Dia anterior
@@ -296,15 +297,19 @@ def solve_recaptcha(driver, api_key):
 def aplicar_filtro_data(driver, wait):
     try:
         logging.info("Abrindo o calendário para selecionar período.")
+        # Localiza o campo de data
         calendario = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="input-118"]')))
         calendario.click()
         time.sleep(1)
+        # Seleciona todo o conteúdo e apaga
         calendario.send_keys(Keys.CONTROL + "a")
         calendario.send_keys(Keys.DELETE)
         time.sleep(0.5)
+        # Obtém as datas: do primeiro dia do mês atual até o dia anterior
         inicio_data, fim_data = get_date_range_current_month()
         calendario.send_keys(f"{inicio_data} {fim_data}")
         time.sleep(1)
+        # Clica no botão de aplicar filtro
         aplicar_btn = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="app"]/div[2]/footer/button/span')))
         aplicar_btn.click()
         logging.info(f"Período {inicio_data} até {fim_data} inserido e aplicado.")
@@ -317,10 +322,14 @@ def aplicar_filtro_data(driver, wait):
 def aplicar_filtros(driver, wait):
     try:
         logging.info("Iniciando aplicação de filtros adicionais.")
+        
+        # Clicar no botão de filtros
         filter_button = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="button_side_menu_filter"]')))
         filter_button.click()
         logging.info("Botão de filtros clicado.")
         time.sleep(2)
+        
+        # Selecionar tipos de carga
         tipo_carga = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="title_tp_carga_1d23bd0c-f7f1-4fa7-ba05-4042ec22ea7d"]')))
         tipo_carga.click()
         time.sleep(1)
@@ -338,6 +347,8 @@ def aplicar_filtros(driver, wait):
                 time.sleep(0.5)
             except Exception as e:
                 logging.warning(f"Não foi possível selecionar o tipo de carga '{tipo}': {str(e)}")
+        
+        # Aplicar filtro de Estado do Destinatário
         try:
             estado_filtro = wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="title_uf_consignatario_1d23bd0c-f7f1-4fa7-ba05-4042ec22ea7d"]')))
             estado_filtro.click()
@@ -346,16 +357,21 @@ def aplicar_filtros(driver, wait):
         except Exception as e:
             logging.error("Não foi possível clicar no filtro de Estado do Destinatário.")
             raise
+
         estados_destinatario = ["RJ", "MG", "SP", "ES", "SC", "PR"]
         campo_estado_xpath = '//*[@id="box_uf_consignatario_1d23bd0c-f7f1-4fa7-ba05-4042ec22ea7d"]/div/div[2]/div/div/div/div/div/div[1]/div[1]'
         digitavel_campo_estado_element = wait.until(EC.element_to_be_clickable((By.XPATH, campo_estado_xpath)))
         digitavel_campo_estado_element.click()
         time.sleep(1)
+        
         for estado in estados_destinatario:
             ActionChains(driver).send_keys(estado).send_keys(Keys.ENTER).perform()
             logging.info(f"Estado {estado} inserido.")
             time.sleep(0.5)
+
+        # Aplicar o filtro de data após os demais filtros
         aplicar_filtro_data(driver, wait)
+        
         logging.info("Filtros aplicados com sucesso.")
     except Exception as e:
         logging.error(f"Erro ao aplicar filtros: {str(e)}")
@@ -397,22 +413,35 @@ def adicionar_aba_resumo(df, file_name):
                 return 0.0
 
         resumo_df['QTDE CONTAINER'] = resumo_df['QTDE CONTAINER'].apply(convert_container_qty)
+        
+        # Converter a coluna DATA EMBARQUE para datetime, tratando valores inválidos
         resumo_df['DATA EMBARQUE'] = pd.to_datetime(resumo_df['DATA EMBARQUE'], errors='coerce')
+        
+        # Remover linhas onde a data é inválida (NaT)
         linhas_removidas = resumo_df['DATA EMBARQUE'].isna().sum()
         if linhas_removidas > 0:
             logging.warning(f"Removidas {linhas_removidas} linhas com data de embarque inválida")
+        
         resumo_df = resumo_df.dropna(subset=['DATA EMBARQUE'])
+        
+        # Agora podemos formatar as datas válidas com segurança
         resumo_df['DATA EMBARQUE'] = resumo_df['DATA EMBARQUE'].dt.strftime('%d/%m/%Y')
+        
         logging.info(f"\nAmostra antes do agrupamento (após limpeza de datas): {len(resumo_df)} registros")
         logging.info(resumo_df.head().to_string())
+        
         resumo_agrupado = resumo_df.groupby(['NOME EXPORTADOR', 'DATA CONSULTA', 'DATA EMBARQUE', 'PORTO EMBARQUE'], as_index=False).agg({'QTDE CONTAINER': 'sum'})
         resumo_agrupado = resumo_agrupado.sort_values(['NOME EXPORTADOR', 'DATA CONSULTA', 'DATA EMBARQUE', 'PORTO EMBARQUE']).reset_index(drop=True)
+        
         logging.info("\nAmostra após agrupamento:")
         logging.info(resumo_agrupado.head().to_string())
+        
         resumo_agrupado['QTDE CONTAINER'] = resumo_agrupado['QTDE CONTAINER'].apply(lambda x: f"{x:.2f}".replace('.', ','))
+        
         with pd.ExcelWriter(file_name, engine='openpyxl', mode='a') as writer:
             resumo_agrupado.to_excel(writer, sheet_name='Resumo', index=False)
             logging.info(f"Aba de resumo atualizada com sucesso: {file_name}")
+        
         return resumo_agrupado
     except Exception as e:
         logging.error(f"Erro ao adicionar aba de resumo: {str(e)}")
@@ -490,7 +519,7 @@ def salvar_arquivo_excel(df, nome_arquivo):
 # ----------------- Função Main -----------------
 def main():
     try:
-        # Configuração do Chrome (alterado para o caminho do servidor)
+        # Configuração do Chrome
         chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
         chrome_options = Options()
         chrome_options.add_argument("--headless=new")  # Novo modo headless
@@ -500,7 +529,7 @@ def main():
         chrome_options.add_argument("--window-size=1920,1080")  # Define resolução da janela
         chrome_options.add_argument("--log-level=3")  # Minimiza logs do Chrome
         chrome_options.add_argument("--silent")  # Minimiza logs do Chrome
-
+        
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 20)
@@ -525,8 +554,9 @@ def main():
                 logging.info("Token do captcha obtido: " + captcha_token)
             except Exception as e:
                 logging.warning("Não foi possível resolver o captcha automaticamente: " + str(e))
-            time.sleep(5)
+            time.sleep(5)  # Aguarda para que o token seja processado pelo site
             
+            # Agora, clica no botão de login (ENTRAR) apenas após o token estar injetado
             button_acessar = wait.until(EC.element_to_be_clickable(
                 (By.XPATH, '//*[@id="app"]/div/div/main/div/div/div[1]/div[1]/div[3]/div/div/div/div[1]/div[2]/button')
             ))
@@ -534,17 +564,22 @@ def main():
             logging.info("Botão Acessar clicado.")
             time.sleep(2)
 
+            # Navegar para seção de cabotagem
             navegar_para_secao_cabotagem(driver, wait)
 
+            # Esperar carregamento completo
             WebDriverWait(driver, 20).until(
                 lambda d: d.execute_script("return document.readyState") == "complete"
             )
 
+            # Ajusta o zoom da página para 80% antes de aplicar os filtros
             ajustar_zoom(driver)
-            time.sleep(1)
+            time.sleep(1)  # Pequena pausa para garantir que o zoom foi aplicado
 
+            # Aplicar filtros de carga, estado e porto de descarga
             aplicar_filtros(driver, wait)
 
+            # Cliques nos botões necessários
             buttons = {
                 'Ok': '//*[@id="LSSkeletonCookie__agreeButton"]',
                 'Filtrar': '//*[@id="button_filter"]',
@@ -556,16 +591,22 @@ def main():
                     button = wait.until(EC.element_to_be_clickable((By.XPATH, xpath)))
                     button.click()
                     logging.info(f"Botão {button_name} clicado.")
-                    time.sleep(2)
+                    time.sleep(2)  # Aumentado o tempo de espera entre cliques
+                    
+                    # Adicionar espera especial após clicar em Filtrar e Detalhes
                     if button_name in ['Filtrar', 'Detalhes']:
                         logging.info(f"Aguardando carregamento completo após clicar em {button_name}...")
-                        time.sleep(5)
+                        time.sleep(5)  # Pausa inicial para dar tempo ao JavaScript carregar
+                        
+                        # Esperar até que o loading spinner desapareça (se existir)
                         try:
                             WebDriverWait(driver, 10).until_not(
                                 EC.presence_of_element_located((By.CLASS_NAME, "loading-spinner"))
                             )
                         except:
                             logging.info("Loading spinner não encontrado ou já desapareceu")
+                        
+                        # Esperar até que a tabela esteja presente e visível, especialmente após clicar em Detalhes
                         if button_name == 'Detalhes':
                             try:
                                 WebDriverWait(driver, 20).until(
@@ -574,18 +615,22 @@ def main():
                                 logging.info("Tabela principal carregada e visível")
                             except Exception as e:
                                 logging.warning(f"Aviso: Tempo limite excedido aguardando tabela: {e}")
+                        
+                        # Esperar mais alguns segundos para garantir que todos os dados foram carregados
                         time.sleep(3)
                 except Exception as e:
                     logging.warning(f"Não foi possível clicar no botão {button_name}: {e}")
                     if button_name != 'Ok':
                         raise
 
+            # Verificação de mensagem de ausência de registros
             no_records_xpath = '//*[@id="pdf-export-container"]/div[2]/div/div[1]/div/div[2]/div[2]'
-            time.sleep(2)
+            time.sleep(2)  # Aguarda um instante para a mensagem ser exibida, se houver
             if driver.find_elements(By.XPATH, no_records_xpath):
                 mensagem_no_result = driver.find_element(By.XPATH, no_records_xpath).text.strip()
                 if "Nenhum resultado foi encontrado na sua pesquisa" in mensagem_no_result:
                     logging.warning("Mensagem de ausência de registros encontrada: " + mensagem_no_result)
+                    # Utiliza a nova função para capturar a data final utilizada no filtro
                     _, fim_data = get_date_range_current_month()
                     df_vazio = pd.DataFrame({"Mensagem": [f"Sem dados para o dia informado: {fim_data}"]})
                     nome_arquivo = 'Cabotagem.xlsx'
@@ -596,6 +641,7 @@ def main():
             else:
                 logging.info("Mensagem de 'Nenhum resultado' não encontrada. Prosseguindo com a extração.")
             
+            # Iniciar extração dos dados da tabela
             table = wait.until(EC.presence_of_element_located((By.XPATH, '//*[@id="pdf-export-container"]/div[2]')))
             logging.info("Tabela encontrada. Iniciando extração de dados.")
             time.sleep(5)
