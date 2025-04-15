@@ -1,57 +1,17 @@
-import os
-import time
-import win32com.client as win32
-import pythoncom
-from pywintypes import com_error
+import openpyxl
+from datetime import datetime
 
-# Caminho do arquivo original
-caminho_arquivo = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
+# Caminho do arquivo Excel
+caminho_arquivo = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/iTRACKER_novo_01_06_v2.xlsx"
 
-def aguardar_conexoes(workbook):
-    print("⏳ Atualizando todas as conexões da planilha...")
-    try:
-        workbook.RefreshAll()
-    except com_error:
-        print("⚠️ Erro ao iniciar RefreshAll.")
-        return
-
-    print("⏳ Aguardando todas as conexões finalizarem...")
-    while True:
-        pythoncom.PumpWaitingMessages()
-        atualizando = False
-        for i in range(workbook.Connections.Count):
-            try:
-                conn = workbook.Connections.Item(i+1)
-                if conn.Type == 2:  # xlConnectionTypeOLEDB = 2
-                    atualizando = True
-                    break
-            except com_error:
-                continue
-
-        if not atualizando:
-            print("✅ Todas as conexões finalizaram.")
-            break
-
-        time.sleep(2)
-
-def abrir_e_salvar_automaticamente():
-    # Inicia o Excel
-    excel = win32.gencache.EnsureDispatch('Excel.Application')
-    excel.Visible = True
-    excel.DisplayAlerts = False
-
+def abrir_e_salvar():
     print("🔄 Abrindo a planilha...")
-    workbook = excel.Workbooks.Open(caminho_arquivo)
+    wb = openpyxl.load_workbook(caminho_arquivo, data_only=False)
+    print("🕒 Atualização realizada em:", datetime.now().strftime('%d/%m/%Y %H:%M:%S'))
 
-    time.sleep(5)  # Pequeno delay de segurança
-    aguardar_conexoes(workbook)
-
-    print("💾 Salvando planilha original atualizada...")
-    workbook.Save()
-
-    workbook.Close(False)
-    excel.Quit()
-    print("✅ Processo finalizado com sucesso!")
+    print("💾 Salvando planilha...")
+    wb.save(caminho_arquivo)
+    print("✅ Planilha salva com sucesso!")
 
 if __name__ == "__main__":
-    abrir_e_salvar_automaticamente()
+    abrir_e_salvar()
