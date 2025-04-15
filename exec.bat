@@ -1,44 +1,44 @@
-#!/bin/bash
+@echo off
+setlocal
+cd /d C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial
 
-# Caminho base do projeto
-cd /home/lfragoso/projetos/dash-burgetXLogComexXComercial || {
-  echo "❌ Diretório não encontrado!"
-  exit 1
-}
+REM 1 - Ativar a venv
+call .\venv\Scripts\activate.bat
 
-# 1 - Ativar o ambiente virtual
-source venv/bin/activate
+REM 2 - Executar main.py que está na pasta "mes atual"
+echo ===============================
+echo Executando main.py (mes atual)...
+echo ===============================
+python "main.py"
+if errorlevel 1 (
+    echo ERRO: main.py encontrou erros.
+    pause
+    exit /b %errorlevel%
+)
 
-# 2 - Executar main.py na pasta "mes atual"
-echo "==============================="
-echo "🚀 Executando main.py (mes atual)..."
-echo "==============================="
-python3 main.py
-if [ $? -ne 0 ]; then
-  echo "❌ ERRO: main.py encontrou erros."
-  exit 1
-fi
+REM 3 - Executar atualizar_systracker.py
+echo ===============================
+echo Executando atualizar_systracker.py...
+echo ===============================
+python atualizar_systracker.py
+if errorlevel 1 (
+    echo ERRO: atualizar_systracker.py encontrou erros.
+    pause
+    exit /b %errorlevel%
+)
 
-# 3 - Executar atualizar_systracker.py
-echo "==============================="
-echo "🔁 Executando atualizar_systracker.py..."
-echo "==============================="
-python3 atualizar_systracker.py
-if [ $? -ne 0 ]; then
-  echo "❌ ERRO: atualizar_systracker.py encontrou erros."
-  exit 1
-fi
+REM 4 - Executar app.py
+echo ===============================
+echo Executando app.py...
+echo ===============================
+python app.py
+if errorlevel 1 (
+    echo ERRO: app.py encontrou erros.
+    pause
+    exit /b %errorlevel%
+)
 
-# 4 - Executar app.py
-echo "==============================="
-echo "📊 Executando app.py..."
-echo "==============================="
-python3 app.py
-if [ $? -ne 0 ]; then
-  echo "❌ ERRO: app.py encontrou erros."
-  exit 1
-fi
-
-echo "==============================="
-echo "✅ Execução concluída com sucesso!"
-echo "==============================="
+echo ===============================
+echo Execução concluída com sucesso!
+echo ===============================
+pause
