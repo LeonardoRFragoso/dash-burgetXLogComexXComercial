@@ -436,13 +436,17 @@ def main():
     try:
         chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
         chrome_options = Options()
-        #chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--log-level=3")
         chrome_options.add_argument("--silent")
+
+        # Adicionar diretório de perfil temporário
+        user_data_dir = f"/tmp/chrome_profile_{int(time.time())}"
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
+
         
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
