@@ -13,6 +13,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
+import tempfile
 
 # ----------------- Funções de Data -----------------
 def get_date_range_7_days():
@@ -434,16 +435,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def main():
     try:
-        # Configuração do Chrome (alterado para o caminho do servidor)
-        chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
+        chrome_driver_path = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\chromedriver.exe"
         chrome_options = Options()
-        #chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
+        # chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--log-level=3")
         chrome_options.add_argument("--silent")
+        
+        # Adicionando um diretório de dados exclusivo para evitar conflitos de sessão
+        user_data_dir = tempfile.mkdtemp()
+        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
         
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
@@ -462,6 +466,7 @@ def main():
             
             slow_typing(email_field, email)
             slow_typing(password_field, password)
+            # Removido o envio de RETURN para evitar submissão prematura
             logging.info("Campos preenchidos, iniciando resolução do reCAPTCHA.")
             
             # Resolver o reCAPTCHA via 2Captcha e injetar o token
@@ -470,8 +475,9 @@ def main():
                 logging.info("Token do captcha obtido: " + captcha_token)
             except Exception as e:
                 logging.warning("Não foi possível resolver o captcha automaticamente: " + str(e))
-            time.sleep(5)
+            time.sleep(5)  # Aguarda para que o token seja processado pelo site
             
+            # Agora, clica no botão de login (ENTRAR) apenas após o token estar injetado
             button_acessar = wait.until(EC.element_to_be_clickable(
                 (By.XPATH, '//*[@id="app"]/div/div/main/div/div/div[1]/div[1]/div[3]/div/div/div/div[1]/div[2]/button')
             ))
@@ -503,6 +509,7 @@ def main():
             calendario.send_keys(Keys.CONTROL + "a")
             calendario.send_keys(Keys.DELETE)
             time.sleep(0.5)
+            # Aqui é realizada a busca com o novo intervalo de datas
             inicio_data, fim_data = get_date_range_current_month()
             calendario.send_keys(f"{inicio_data} {fim_data}")
             time.sleep(1)
@@ -542,7 +549,7 @@ def main():
             
             # Verificação de mensagem de ausência de registros após clicar em "Detalhes"
             no_records_xpath = '//*[@id="pdf-export-container"]/div[2]/div/div[1]/div/div[2]/div[2]'
-            time.sleep(2)
+            time.sleep(2)  # Aguarda um instante para a mensagem ser exibida, se houver
             if driver.find_elements(By.XPATH, no_records_xpath):
                 mensagem = driver.find_element(By.XPATH, no_records_xpath).text
                 logging.info(f"Mensagem de ausência de registros encontrada: {mensagem}")
