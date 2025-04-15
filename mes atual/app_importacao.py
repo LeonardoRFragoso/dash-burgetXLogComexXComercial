@@ -485,19 +485,26 @@ def solve_recaptcha(driver, api_key):
 
 def main():
     try:
-        # Configuração do Chrome (alterado para o caminho do servidor)
         chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
         chrome_options = Options()
-        chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
+        chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--log-level=3")
-        chrome_options.add_argument("--silent")
+        chrome_options.add_argument("--disable-extensions")
+        chrome_options.add_argument("--disable-software-rasterizer")
+        chrome_options.add_argument("--remote-debugging-port=0")
+
+        # Log auxiliar para confirmar os argumentos ativos (opcional)
+        for arg in chrome_options.arguments:
+            logger.debug(f"[DEBUG] Chrome argument ativo: {arg}")
+
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 30)
+
         try:
             driver.get("https://plataforma.logcomex.io/signIn/")
             logger.info("Acessando o site de login.")
