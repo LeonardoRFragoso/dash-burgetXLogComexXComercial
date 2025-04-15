@@ -1,6 +1,5 @@
 import time
 import requests
-import tempfile
 import logging
 import re
 import os
@@ -435,26 +434,19 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 
 def main():
     try:
-        chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
+        chrome_driver_path = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\chromedriver.exe"
         chrome_options = Options()
-        chrome_options.add_argument("--headless=new")
+        #chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--log-level=3")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-software-rasterizer")
-        chrome_options.add_argument("--remote-debugging-port=0")  # Desativa porta padrão usada para debugging
-
-
-        # Remover completamente o --user-data-dir
-        # (pois está causando conflitos no ambiente atual)
-
+        chrome_options.add_argument("--silent")
+        
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 20)
-
         
         try:
             driver.get("https://plataforma.logcomex.io/signIn/")

@@ -63,7 +63,7 @@ def get_date_range_30_days():
 def get_date_range_current_month():
     hoje = datetime.now()
     inicio = datetime(hoje.year, hoje.month, 1)
-    # Calcula o último dia do mês atual
+    # Calcula o primeiro dia do próximo mês e subtrai um dia para obter o último dia do mês atual
     if hoje.month == 12:
         next_month = datetime(hoje.year + 1, 1, 1)
     else:
@@ -301,6 +301,7 @@ def navegar_para_secao(driver, wait):
         ActionChains(driver).move_to_element(brasil).click().perform()
         logger.info("Brasil selecionado.")
         time.sleep(2)
+
     except Exception as e:
         logger.error(f"Erro ao navegar para seção de importação: {e}")
         driver.save_screenshot("erro_navegacao_importacao.png")
@@ -485,26 +486,18 @@ def solve_recaptcha(driver, api_key):
 
 def main():
     try:
-        chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
+        chrome_driver_path = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\chromedriver.exe"
         chrome_options = Options()
-        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--log-level=3")
-        chrome_options.add_argument("--disable-extensions")
-        chrome_options.add_argument("--disable-software-rasterizer")
-        chrome_options.add_argument("--remote-debugging-port=0")
-
-        # Log auxiliar para confirmar os argumentos ativos (opcional)
-        for arg in chrome_options.arguments:
-            logger.debug(f"[DEBUG] Chrome argument ativo: {arg}")
-
+        chrome_options.add_argument("--silent")
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
         wait = WebDriverWait(driver, 30)
-
         try:
             driver.get("https://plataforma.logcomex.io/signIn/")
             logger.info("Acessando o site de login.")
@@ -590,6 +583,7 @@ def main():
             calendario.send_keys(Keys.CONTROL + "a")
             calendario.send_keys(Keys.DELETE)
             time.sleep(0.5)
+            # Nova chamada utilizando o intervalo do mês atual completo
             inicio_data, fim_data = get_date_range_current_month()
             calendario.send_keys(f"{inicio_data} {fim_data}")
             time.sleep(1)
