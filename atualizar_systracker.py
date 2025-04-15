@@ -5,7 +5,7 @@ import pythoncom
 from pywintypes import com_error
 
 # Caminho do arquivo original
-caminho_arquivo = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\iTRACKER_novo 01.06 v2.xlsx"
+caminho_arquivo = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
 
 def aguardar_conexoes(workbook):
     print("⏳ Atualizando todas as conexões da planilha...")
