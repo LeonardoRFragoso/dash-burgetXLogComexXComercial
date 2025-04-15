@@ -13,7 +13,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.action_chains import ActionChains
-import tempfile
 
 # ----------------- Funções de Data -----------------
 def get_date_range_7_days():
@@ -437,17 +436,13 @@ def main():
     try:
         chrome_driver_path = "/home/lfragoso/projetos/dash-burgetXLogComexXComercial/chromedriver"
         chrome_options = Options()
-        # chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
+        #chrome_options.add_argument("--headless=new")  # Modo headless, se desejado
         chrome_options.add_argument("--disable-gpu")
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--window-size=1920,1080")
         chrome_options.add_argument("--log-level=3")
         chrome_options.add_argument("--silent")
-        
-        # Adicionando um diretório de dados exclusivo para evitar conflitos de sessão
-        user_data_dir = tempfile.mkdtemp()
-        chrome_options.add_argument(f"--user-data-dir={user_data_dir}")
         
         service = Service(chrome_driver_path)
         driver = webdriver.Chrome(service=service, options=chrome_options)
