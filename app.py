@@ -25,9 +25,9 @@ CLIENTES_TXT = "clientes.txt"  # arquivo de clientes (utilizado no Script 1)
 
 #--------------------------------------
 # CONFIGURAÇÕES (Script 2)
-ITRACKER_PATH = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\iTRACKER_novo 01.06 v2.xlsx"
-CLIENTES_TXT_SCRIPT2 = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\clientes.txt"
-COMPARATIVO_PATH = r"C:\Users\leonardo.fragoso\Desktop\Projetos\dash-burgetXLogComexXComercial\comparativo_budget_vs_logcomex_final.xlsx"
+ITRACKER_PATH = r"C:\Users\leonardo.fragoso\Desktop\Projetos\burgetXLogComexXComercial\iTRACKER_novo 01.06 v2.xlsx"
+CLIENTES_TXT_SCRIPT2 = r"C:\Users\leonardo.fragoso\Desktop\Projetos\burgetXLogComexXComercial\clientes.txt"
+COMPARATIVO_PATH = r"C:\Users\leonardo.fragoso\Desktop\Projetos\burgetXLogComexXComercial\comparativo_budget_vs_logcomex_final.xlsx"
 
 #--------------------------------------
 # NOVA CONFIGURAÇÃO: IDs de destino para os envios ao Google Drive

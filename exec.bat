@@ -16,18 +16,7 @@ if errorlevel 1 (
     exit /b %errorlevel%
 )
 
-REM 3 - Executar atualizar_systracker.py
-echo ===============================
-echo Executando atualizar_systracker.py...
-echo ===============================
-python atualizar_systracker.py
-if errorlevel 1 (
-    echo ERRO: atualizar_systracker.py encontrou erros.
-    pause
-    exit /b %errorlevel%
-)
-
-REM 4 - Executar app.py
+REM 3 - Executar app.py
 echo ===============================
 echo Executando app.py...
 echo ===============================
