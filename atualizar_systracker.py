@@ -38,13 +38,6 @@ def baixar_planilha(service):
 
 # === ATUALIZAÇÃO NO EXCEL ===
 def aguardar_conexoes(workbook):
-    print("⏳ Atualizando todas as conexões da planilha...")
-    try:
-        workbook.RefreshAll()
-    except com_error:
-        print("⚠️ Erro ao iniciar RefreshAll.")
-        return
-
     print("⏳ Aguardando conexões finalizarem...")
     while True:
         pythoncom.PumpWaitingMessages()
@@ -62,6 +55,7 @@ def aguardar_conexoes(workbook):
             break
         time.sleep(2)
 
+
 def atualizar_excel():
     excel = win32.gencache.EnsureDispatch('Excel.Application')
     excel.Visible = True
@@ -70,6 +64,17 @@ def atualizar_excel():
     print("🔄 Abrindo planilha no Excel...")
     workbook = excel.Workbooks.Open(CAMINHO_LOCAL)
     time.sleep(5)
+
+    # Focar na janela do Excel antes de enviar teclas
+    workbook.Activate()
+    excel.Windows(workbook.Name).Activate()
+    time.sleep(1)
+
+    # Disparar atualização via ALT+F5
+    print("⌨️ Enviando ALT+F5 para atualizar dados no Excel...")
+    excel.SendKeys("%{F5}", True)
+
+    # Aguardar conexões (Power Query, etc.) finalizarem
     aguardar_conexoes(workbook)
 
     print("💾 Salvando alterações...")
@@ -80,7 +85,11 @@ def atualizar_excel():
 
 # === UPLOAD PARA O GDRIVE ===
 def enviar_para_drive(service):
-    media = MediaFileUpload(CAMINHO_LOCAL, mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', resumable=True)
+    media = MediaFileUpload(
+        CAMINHO_LOCAL,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        resumable=True
+    )
     print("📤 Enviando planilha atualizada ao Google Drive...")
     service.files().update(fileId=FILE_ID, media_body=media).execute()
     print("✅ Upload concluído.")
